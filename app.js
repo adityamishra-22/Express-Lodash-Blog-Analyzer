@@ -1,26 +1,24 @@
-const express = require('express');
-const axios = require('axios');
-const _ = require('lodash');
+const express = require("express");
+const axios = require("axios");
+const _ = require("lodash");
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize an empty cache object
+// Cache object with expiration support
 const cache = {};
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
-// Step 3: Define Routes
-app.get('/api/blog-stats', async (req, res) => {
+// Routes
+app.get("/api/blog-stats", async (req, res) => {
   try {
-    // Step 4: Data Retrieval (Replace with actual API request)
-    const blogData = await getCachedData('blog-stats'); // Implement this function
+    const blogData = await getCachedData("blog-stats", fetchDataFromAPI);
 
-    // Step 5: Data Analysis
     const totalBlogs = blogData.length;
     const longestBlog = findLongestBlog(blogData);
     const privacyBlogsCount = countPrivacyBlogs(blogData);
     const uniqueBlogTitles = getUniqueBlogTitles(blogData);
 
-    // Step 6: Response
     const statistics = {
       totalBlogs,
       longestBlog,
@@ -30,109 +28,87 @@ app.get('/api/blog-stats', async (req, res) => {
 
     res.json(statistics);
   } catch (error) {
-    // Step 8: Error Handling
     console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// Step 7: Blog Search Endpoint
-app.get('/api/blog-search', async (req, res) => {
+app.get("/api/blog-search", async (req, res) => {
   const query = req.query.query;
-
   if (!query) {
-    return res.status(400).json({ error: 'Query parameter is missing' });
+    return res.status(400).json({ error: "Query parameter is missing" });
   }
 
   try {
-    // Check if the search results are cached
-    const searchResults = await getCachedData(`blog-search-${query}`);
-
-    // If not cached, fetch data and store in cache
-    if (!searchResults) {
+    const cacheKey = `blog-search-${query}`;
+    const searchResults = await getCachedData(cacheKey, async () => {
       const blogData = await fetchDataFromAPI();
-      const filteredResults = blogData.filter(blog =>
+      return _.filter(blogData, (blog) =>
         blog.title.toLowerCase().includes(query.toLowerCase())
       );
+    });
 
-      // Cache the results with a unique key
-      cache[`blog-search-${query}`] = filteredResults;
-      res.json(filteredResults);
-    } else {
-      res.json(searchResults);
-    }
+    res.json(searchResults);
   } catch (error) {
-    // Error Handling
     console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// Start the Express server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// Helper functions (implement these)
+// Helper functions
 async function fetchDataFromAPI() {
   try {
-    const response = await axios.get('https://intent-kit-16.hasura.app/api/rest/blogs', {
-      headers: {
-        'x-hasura-admin-secret': '32qR4KmXOIpsGPQKMqEJHGJS27G5s7HdSKO3gdtQd2kv5e852SiYwWNfxkZOBuQ6',
-      },
-    });
+    const response = await axios.get(
+      "https://intent-kit-16.hasura.app/api/rest/blogs",
+      {
+        headers: {
+          "x-hasura-admin-secret":
+            "32qR4KmXOIpsGPQKMqEJHGJS27G5s7HdSKO3gdtQd2kv5e852SiYwWNfxkZOBuQ6",
+        },
+      }
+    );
 
-    // Assuming the API returns an array of blog data
-    return response.data;
+    return response.data.blogs || response.data;
   } catch (error) {
-    console.error('Failed to fetch data from the API:', error.message);
-    throw new Error('Failed to fetch data from the API');
+    console.error("Failed to fetch data from the API:", error.message);
+    throw new Error("Failed to fetch data from the API");
   }
 }
 
 function findLongestBlog(blogData) {
-  if (!blogData || blogData.length === 0) {
-    return null; // Return null for no data
-  }
-
-  let longestTitle = '';
-  for (const blog of blogData) {
-    if (blog.title.length > longestTitle.length) {
-      longestTitle = blog.title;
-    }
-  }
-
-  return longestTitle;
+  if (!blogData || blogData.length === 0) return null;
+  return _.maxBy(blogData, (blog) => blog.title.length)?.title || null;
 }
 
 function countPrivacyBlogs(blogData) {
-  if (!blogData || blogData.length === 0) {
-    return 0; // Return 0 for no data
-  }
-
-  const privacyKeyword = 'privacy';
-  const privacyBlogs = blogData.filter(blog =>
-    blog.title.toLowerCase().includes(privacyKeyword)
-  );
-
-  return privacyBlogs.length;
+  if (!blogData || blogData.length === 0) return 0;
+  const keyword = "privacy";
+  return _.filter(blogData, (blog) =>
+    blog.title.toLowerCase().includes(keyword)
+  ).length;
 }
 
 function getUniqueBlogTitles(blogData) {
-  if (!blogData || blogData.length === 0) {
-    return []; // Return an empty array for no data
-  }
-
-  const uniqueTitles = [...new Set(blogData.map(blog => blog.title))];
-  return uniqueTitles;
+  if (!blogData || blogData.length === 0) return [];
+  return _.uniq(blogData.map((blog) => blog.title));
 }
 
-// Function to get cached data
-async function getCachedData(key) {
-  // Check if data is in the cache and not expired
-  const cachedData = cache[key];
-  if (cachedData) {
-    return cachedData;
+async function getCachedData(key, fetchFunction) {
+  const entry = cache[key];
+  const now = Date.now();
+  if (entry && now - entry.timestamp < CACHE_DURATION_MS) {
+    return entry.data;
   }
-  return null;
+
+  const freshData = await fetchFunction();
+  cache[key] = {
+    data: freshData,
+    timestamp: now,
+  };
+
+  return freshData;
 }
