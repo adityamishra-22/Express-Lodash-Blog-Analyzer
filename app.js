@@ -61,16 +61,20 @@ app.listen(port, () => {
 
 // Helper functions
 async function fetchDataFromAPI() {
-  try {
-    const response = await axios.get(
-      "https://intent-kit-16.hasura.app/api/rest/blogs",
-      {
-        headers: {
-          "x-hasura-admin-secret":
-            "32qR4KmXOIpsGPQKMqEJHGJS27G5s7HdSKO3gdtQd2kv5e852SiYwWNfxkZOBuQ6",
-        },
-      }
-    );
+  // Mocked blog data for local testing
+  return [
+    { title: "Understanding Privacy Policies in 2024" },
+    { title: "Intro to Web Security" },
+    { title: "Privacy vs Personalization" },
+    { title: "Top 10 JavaScript Tricks" },
+    { title: "Graph Algorithms Demystified" },
+    { title: "Privacy is Dead. Or is it?" },
+    { title: "Intro to Privacy Law" },
+    { title: "How Browsers Handle User Data" },
+    { title: "Privacy Tools You Should Know" },
+    { title: "Advanced Sorting Algorithms" }
+  ];
+}
 
     return response.data.blogs || response.data;
   } catch (error) {
