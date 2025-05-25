@@ -1,5 +1,4 @@
 const express = require("express");
-const axios = require("axios");
 const _ = require("lodash");
 
 const app = express();
@@ -72,15 +71,8 @@ async function fetchDataFromAPI() {
     { title: "Intro to Privacy Law" },
     { title: "How Browsers Handle User Data" },
     { title: "Privacy Tools You Should Know" },
-    { title: "Advanced Sorting Algorithms" }
+    { title: "Advanced Sorting Algorithms" },
   ];
-}
-
-    return response.data.blogs || response.data;
-  } catch (error) {
-    console.error("Failed to fetch data from the API:", error.message);
-    throw new Error("Failed to fetch data from the API");
-  }
 }
 
 function findLongestBlog(blogData) {
